@@ -56,22 +56,21 @@ function ProductBarcode({ value, name }) {
               width: 100mm;
               height: 148mm;
               display: flex;
+              flex-direction: column;
               align-items: center;
-              justify-content: center;
+              justify-content: flex-start;
+              padding-top: 15mm;
               background-color: #ffffff;
               overflow: hidden;
             }
             .barcode-container {
               display: flex;
-              align-items: center;
               justify-content: center;
               width: 100%;
-              height: 100%;
             }
             .barcode-container svg {
               width: 85mm !important;
               height: auto !important;
-              max-height: 130mm;
             }
           </style>
         </head>
