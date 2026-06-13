@@ -12,9 +12,9 @@ function ProductBarcode({ value }) {
     if (svgRef.current && value) {
       try {
         JsBarcode(svgRef.current, value, {
-          format: 'CODE39',
+          format: 'CODE128',
           lineColor: '#000',
-          width: 1.5,
+          width: 1.8,
           height: 45,
           displayValue: true,
           fontSize: 12
