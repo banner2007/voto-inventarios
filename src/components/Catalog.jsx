@@ -5,7 +5,7 @@ import JsBarcode from 'jsbarcode';
 /**
  * Componente para renderizar Código de Barras Code39
  */
-function ProductBarcode({ value }) {
+function ProductBarcode({ value, name }) {
   const svgRef = useRef(null);
 
   useEffect(() => {
@@ -25,9 +25,152 @@ function ProductBarcode({ value }) {
     }
   }, [value]);
 
+  const handlePrint = (e) => {
+    e.stopPropagation();
+    if (!svgRef.current || !value) return;
+
+    const barcodeHtml = svgRef.current.outerHTML;
+    const printWindow = window.open('', '_blank', 'width=600,height=800');
+    if (!printWindow) {
+      alert('Por favor, permita las ventanas emergentes (popups) para poder imprimir el código de barras.');
+      return;
+    }
+
+    const doc = printWindow.document;
+    doc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Imprimir Código - ${name || 'Producto'}</title>
+          <link rel="preconnect" href="https://fonts.googleapis.com">
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+          <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700&display=swap" rel="stylesheet">
+          <style>
+            @page {
+              size: 100mm 148mm portrait;
+              margin: 0;
+            }
+            * {
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0;
+            }
+            body {
+              width: 100mm;
+              height: 148mm;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: space-between;
+              padding: 15mm 10mm;
+              font-family: 'Outfit', sans-serif;
+              background-color: #ffffff;
+              color: #0f172a;
+              text-align: center;
+            }
+            .header {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 4px;
+              width: 100%;
+            }
+            .brand {
+              font-size: 12px;
+              font-weight: 700;
+              letter-spacing: 2px;
+              text-transform: uppercase;
+              color: #4f46e5;
+            }
+            .divider {
+              width: 50px;
+              height: 2px;
+              background: linear-gradient(90deg, #4f46e5, #10b981);
+              margin: 8px 0;
+              border-radius: 1px;
+            }
+            .product-name {
+              font-size: 16px;
+              font-weight: 600;
+              line-height: 1.4;
+              margin-top: 8px;
+              max-height: 48px;
+              overflow: hidden;
+              display: -webkit-box;
+              -webkit-line-clamp: 2;
+              -webkit-box-orient: vertical;
+              color: #0f172a;
+            }
+            .barcode-container {
+              flex-grow: 1;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              width: 100%;
+            }
+            .barcode-container svg {
+              width: 80mm !important;
+              height: auto !important;
+              max-height: 50mm;
+            }
+            .footer {
+              font-size: 10px;
+              color: #64748b;
+              width: 100%;
+              border-top: 1px solid #e2e8f0;
+              padding-top: 10px;
+              display: flex;
+              justify-content: space-between;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <span class="brand">VOTO NACIONAL</span>
+            <div class="divider"></div>
+            <h2 class="product-name">${name || 'Producto sin nombre'}</h2>
+          </div>
+          <div class="barcode-container">
+            ${barcodeHtml}
+          </div>
+          <div class="footer">
+            <span>REF: ${value}</span>
+            <span>${new Date().toLocaleDateString('es-CO')}</span>
+          </div>
+          <script>
+            window.addEventListener('load', () => {
+              setTimeout(() => {
+                window.print();
+                window.close();
+              }, 400);
+            });
+          <\/script>
+        </body>
+      </html>
+    `);
+    doc.close();
+  };
+
   return (
-    <div className="barcode-box">
+    <div 
+      className="barcode-box clickable-barcode" 
+      onClick={handlePrint}
+      title="Haga clic para imprimir este código de barras"
+      style={{
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+      }}
+    >
       <svg ref={svgRef} className="barcode-svg"></svg>
+      <span style={{
+        fontSize: '0.7rem',
+        color: 'var(--text-muted)',
+        marginTop: '0.25rem',
+        display: 'block'
+      }}>
+        🖨️ Clic para imprimir
+      </span>
     </div>
   );
 }
@@ -235,7 +378,7 @@ export default function Catalog({ token, showToast }) {
                     </td>
                     <td style={{ fontWeight: 600 }}>{p.Referencia}</td>
                     <td>
-                      <ProductBarcode value={p.Referencia} />
+                      <ProductBarcode value={p.Referencia} name={p.Nombre} />
                     </td>
                     <td style={{ fontWeight: 500 }}>{p.Nombre}</td>
                     <td style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -288,8 +431,8 @@ export default function Catalog({ token, showToast }) {
 
                 {referencia && (
                   <div className="form-group">
-                    <label>Código de Barras Previsualizado (Code39)</label>
-                    <ProductBarcode value={referencia} />
+                    <label>Código de Barras Previsualizado (CODE128)</label>
+                    <ProductBarcode value={referencia} name={nombre || 'Previsualización'} />
                   </div>
                 )}
 

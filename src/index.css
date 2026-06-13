@@ -699,6 +699,27 @@ tr:hover td {
   margin-top: 0.5rem;
 }
 
+.barcode-box.clickable-barcode {
+  transition: var(--transition);
+}
+
+.barcode-box.clickable-barcode:hover {
+  border-color: var(--primary) !important;
+  background-color: #f8fafc !important; /* Keep barcode background very light for readability */
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+[data-theme="dark"] .barcode-box.clickable-barcode {
+  background-color: #ffffff; /* Keep background white for barcode scan readability even in dark theme */
+  color: #0f172a;
+}
+
+[data-theme="dark"] .barcode-box.clickable-barcode:hover {
+  border-color: var(--primary) !important;
+  background-color: #f1f5f9 !important;
+}
+
 .barcode-svg {
   max-width: 100%;
 }
