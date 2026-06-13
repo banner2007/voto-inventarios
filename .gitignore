@@ -1,0 +1,18 @@
+# Dependencias
+node_modules/
+
+# Entorno Node Portable
+node-portable/
+node-portable-temp/
+node-portable.zip
+
+# Compilación
+dist/
+
+# Entorno local
+.env
+
+# Logs y misceláneos
+*.log
+.DS_Store
+Thumbs.db
