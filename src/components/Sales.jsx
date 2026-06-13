@@ -49,8 +49,13 @@ export default function Sales({ token, user, showToast }) {
   // Buscar coincidencia exacta al digitar o escanear
   const handleScanSubmit = (e) => {
     e.preventDefault();
-    const query = scanQuery.trim().toUpperCase();
+    let query = scanQuery.trim().toUpperCase();
     if (!query) return;
+
+    // Remover asteriscos de inicio/fin si el escáner los transmite (común en Code39)
+    if (query.startsWith('*') && query.endsWith('*') && query.length > 2) {
+      query = query.slice(1, -1);
+    }
 
     // Buscar por Referencia exacta
     const prod = products.find(p => p.Referencia.toUpperCase() === query);
