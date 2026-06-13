@@ -1,4 +1,4 @@
-import { readTable, appendRows, updateRow } from './googleSheets.js';
+import { readTable, appendRows, updateRow, deleteRows } from './googleSheets.js';
 import { logAudit } from './audit.js';
 import { Mutex } from 'async-mutex';
 import crypto from 'crypto';
@@ -378,4 +378,231 @@ export async function getDashboardStats() {
     ultimosMovimientos,
     alertasStockBajo
   };
+}
+
+export async function getPurchases() {
+  const purchases = await readTable('Compras');
+  return purchases.map(p => ({
+    ...p,
+    TotalIva: parseFloat(p.TotalIva) || 0,
+    TotalCompra: parseFloat(p.TotalCompra) || 0
+  }));
+}
+
+export async function getPurchaseById(idCompra) {
+  const purchases = await readTable('Compras');
+  const purchase = purchases.find(p => p.IdCompra === idCompra);
+  if (!purchase) throw new Error('Compra no encontrada.');
+
+  const allDetails = await readTable('CompraDetalles');
+  const details = allDetails
+    .filter(d => d.IdCompra === idCompra)
+    .map(d => ({
+      ...d,
+      Cantidad: parseInt(d.Cantidad, 10) || 0,
+      PrecioCosto: parseFloat(d.PrecioCosto) || 0,
+      IvaPagado: parseFloat(d.IvaPagado) || 0,
+      Total: parseFloat(d.Total) || 0
+    }));
+
+  return {
+    header: {
+      ...purchase,
+      TotalIva: parseFloat(purchase.TotalIva) || 0,
+      TotalCompra: parseFloat(purchase.TotalCompra) || 0
+    },
+    items: details
+  };
+}
+
+export async function deletePurchase(idCompra, username) {
+  return await inventoryMutex.runExclusive(async () => {
+    const purchaseData = await getPurchaseById(idCompra);
+    const { header, items } = purchaseData;
+    
+    const products = await getProducts();
+    
+    // 1. Validar que la eliminación no cause stock negativo
+    const productsToUpdate = [];
+    for (const item of items) {
+      const prod = products.find(p => p.Referencia.toUpperCase() === item.ReferenciaProducto.trim().toUpperCase());
+      if (!prod) {
+        throw new Error(`El producto con referencia ${item.ReferenciaProducto} no existe en el catálogo.`);
+      }
+      
+      const nuevoStock = prod.StockActual - item.Cantidad;
+      if (nuevoStock < 0) {
+        throw new Error(`No se puede eliminar la compra porque el producto "${prod.Nombre}" (Ref: ${prod.Referencia}) quedaría con stock negativo (${nuevoStock}).`);
+      }
+      
+      productsToUpdate.push({
+        id: prod.IdProducto,
+        data: {
+          StockActual: nuevoStock
+        }
+      });
+    }
+
+    // 2. Modificar stocks en Google Sheets
+    for (const itemToUpdate of productsToUpdate) {
+      await updateRow('Productos', 'IdProducto', itemToUpdate.id, itemToUpdate.data);
+    }
+
+    // 3. Eliminar registros de Compras y CompraDetalles
+    await deleteRows('Compras', 'IdCompra', idCompra);
+    await deleteRows('CompraDetalles', 'IdCompra', idCompra);
+    
+    // 4. Eliminar movimientos de inventario asociados
+    const allMovements = await readTable('Movimientos');
+    for (const item of items) {
+      const movement = allMovements.find(m => 
+        m.ReferenciaDocumento === header.FacturaNum &&
+        m.ReferenciaProducto === item.ReferenciaProducto &&
+        m.Tipo === 'ENTRADA' &&
+        parseInt(m.Cantidad, 10) === item.Cantidad
+      );
+      if (movement) {
+        await deleteRows('Movimientos', 'IdMovimiento', movement.IdMovimiento);
+      }
+    }
+
+    await logAudit(username, `Eliminó la factura de compra #${header.FacturaNum} del proveedor ${header.ProveedorNombre}. Stock actualizado.`);
+
+    return { success: true };
+  });
+}
+
+export async function updatePurchase(idCompra, header, items, username) {
+  return await inventoryMutex.runExclusive(async () => {
+    // 1. Obtener la compra actual
+    const originalPurchase = await getPurchaseById(idCompra);
+    const originalHeader = originalPurchase.header;
+    const originalItems = originalPurchase.items;
+
+    const suppliers = await getSuppliers();
+    const supplier = suppliers.find(s => s.IdProveedor === header.idProveedor);
+    if (!supplier) throw new Error('Proveedor no encontrado.');
+
+    const products = await getProducts();
+
+    // 2. Revertir temporalmente el stock original
+    const tempStocks = {};
+    products.forEach(p => {
+      tempStocks[p.Referencia] = p.StockActual;
+    });
+
+    originalItems.forEach(item => {
+      if (tempStocks[item.ReferenciaProducto] !== undefined) {
+        tempStocks[item.ReferenciaProducto] -= item.Cantidad;
+      }
+    });
+
+    // 3. Aplicar las nuevas cantidades y validar que no queden en negativo
+    const finalProductsToUpdate = [];
+    const detailsToAppend = [];
+    const movementsToAppend = [];
+
+    let calculatedTotalIva = 0;
+    let calculatedTotalCompra = 0;
+
+    for (const item of items) {
+      const prod = products.find(p => p.Referencia.toUpperCase() === item.referencia.trim().toUpperCase());
+      if (!prod) {
+        throw new Error(`El producto con referencia ${item.referencia} no existe.`);
+      }
+
+      const cantidad = parseInt(item.cantidad, 10);
+      const precioCosto = parseFloat(item.precioCosto);
+      const ivaPagado = parseFloat(item.ivaPagado) || 0;
+      const totalFila = (cantidad * precioCosto) + ivaPagado;
+
+      calculatedTotalIva += ivaPagado;
+      calculatedTotalCompra += totalFila;
+
+      // Calcular nuevo stock basado en el stock revertido
+      if (tempStocks[prod.Referencia] === undefined) {
+        tempStocks[prod.Referencia] = prod.StockActual;
+      }
+      const nuevoStock = tempStocks[prod.Referencia] + cantidad;
+      if (nuevoStock < 0) {
+        throw new Error(`No se puede actualizar la compra porque el producto "${prod.Nombre}" (Ref: ${prod.Referencia}) quedaría con stock negativo (${nuevoStock}).`);
+      }
+      tempStocks[prod.Referencia] = nuevoStock;
+
+      finalProductsToUpdate.push({
+        id: prod.IdProducto,
+        data: {
+          PrecioCompra: precioCosto, // Actualiza con el último costo
+          StockActual: nuevoStock
+        }
+      });
+
+      // Detalle de Compra nuevo
+      detailsToAppend.push({
+        IdCompraDetalle: crypto.randomUUID(),
+        IdCompra: idCompra,
+        ReferenciaProducto: prod.Referencia,
+        NombreProducto: prod.Nombre,
+        Cantidad: cantidad,
+        PrecioCosto: precioCosto,
+        IvaPagado: ivaPagado,
+        Total: totalFila
+      });
+
+      // Movimiento de inventario (ENTRADA) nuevo
+      movementsToAppend.push({
+        IdMovimiento: crypto.randomUUID(),
+        ReferenciaProducto: prod.Referencia,
+        Tipo: 'ENTRADA',
+        Cantidad: cantidad,
+        PrecioUnitario: precioCosto,
+        ReferenciaDocumento: header.facturaNum,
+        Usuario: username,
+        Fecha: new Date().toISOString()
+      });
+    }
+
+    // 4. Guardar los cambios de stock en Productos
+    for (const itemToUpdate of finalProductsToUpdate) {
+      await updateRow('Productos', 'IdProducto', itemToUpdate.id, itemToUpdate.data);
+    }
+
+    // 5. Actualizar el encabezado en Compras
+    const updatedPurchase = {
+      IdProveedor: header.idProveedor,
+      ProveedorNombre: supplier.Nombre,
+      FacturaNum: header.facturaNum.trim(),
+      FechaCompra: header.fechaCompra,
+      TotalIva: calculatedTotalIva,
+      TotalCompra: calculatedTotalCompra,
+      Usuario: username
+      // Mantener FechaRegistro del original
+    };
+    await updateRow('Compras', 'IdCompra', idCompra, updatedPurchase);
+
+    // 6. Eliminar detalles antiguos de la compra
+    await deleteRows('CompraDetalles', 'IdCompra', idCompra);
+
+    // 7. Eliminar movimientos antiguos correspondientes a la compra anterior
+    const allMovements = await readTable('Movimientos');
+    for (const origItem of originalItems) {
+      const movement = allMovements.find(m => 
+        m.ReferenciaDocumento === originalHeader.FacturaNum &&
+        m.ReferenciaProducto === origItem.ReferenciaProducto &&
+        m.Tipo === 'ENTRADA' &&
+        parseInt(m.Cantidad, 10) === origItem.Cantidad
+      );
+      if (movement) {
+        await deleteRows('Movimientos', 'IdMovimiento', movement.IdMovimiento);
+      }
+    }
+
+    // 8. Insertar los nuevos detalles y movimientos
+    await appendRows('CompraDetalles', detailsToAppend);
+    await appendRows('Movimientos', movementsToAppend);
+
+    await logAudit(username, `Actualizó factura de compra #${header.facturaNum} (anterior: #${originalHeader.FacturaNum}) de proveedor ${supplier.Nombre}. Total: $${calculatedTotalCompra}`);
+
+    return { idCompra, totalCompra: calculatedTotalCompra };
+  });
 }

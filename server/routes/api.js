@@ -12,7 +12,11 @@ import {
   registerPurchase,
   registerSale,
   updateProductPrice,
-  getDashboardStats
+  getDashboardStats,
+  getPurchases,
+  getPurchaseById,
+  updatePurchase,
+  deletePurchase
 } from '../services/inventory.js';
 import { readTable } from '../services/googleSheets.js';
 
@@ -143,6 +147,51 @@ router.post('/purchases', authenticateToken, async (req, res) => {
     
     const result = await registerPurchase(header, items, req.user.username);
     res.status(201).json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/purchases', authenticateToken, async (req, res) => {
+  try {
+    const purchases = await getPurchases();
+    res.json(purchases);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/purchases/:id', authenticateToken, async (req, res) => {
+  try {
+    const purchase = await getPurchaseById(req.params.id);
+    res.json(purchase);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.put('/purchases/:id', authenticateToken, async (req, res) => {
+  try {
+    const { header, items } = req.body;
+    if (!header || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Datos de cabecera y artículos comprados obligatorios.' });
+    }
+    const { idProveedor, facturaNum, fechaCompra } = header;
+    if (!idProveedor || !facturaNum || !fechaCompra) {
+      return res.status(400).json({ error: 'Proveedor, número de factura y fecha de compra obligatorios.' });
+    }
+    
+    const result = await updatePurchase(req.params.id, header, items, req.user.username);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/purchases/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await deletePurchase(req.params.id, req.user.username);
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

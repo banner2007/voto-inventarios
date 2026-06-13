@@ -279,3 +279,72 @@ export async function updateRow(sheetName, keyColumn, keyValue, updatedFields) {
     throw error;
   }
 }
+
+/**
+ * Elimina una o más filas que coinciden con un valor clave
+ */
+export async function deleteRows(sheetName, keyColumn, keyValue) {
+  if (!sheets) throw new Error('Google Sheets API no configurada.');
+
+  try {
+    const headers = REQUIRED_SHEETS[sheetName];
+    if (!headers) throw new Error(`Tabla ${sheetName} no reconocida.`);
+
+    const keyIndex = headers.indexOf(keyColumn);
+    if (keyIndex === -1) throw new Error(`Columna clave ${keyColumn} no existe en ${sheetName}.`);
+
+    // Leer toda la hoja para ubicar los índices de las filas a eliminar
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!A1:Z10000`,
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length <= 1) return false;
+
+    // Buscar todos los índices de fila coincidentes
+    const rowsToDelete = [];
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][keyIndex] === String(keyValue)) {
+        rowsToDelete.push(i); // Índice basado en 0 para el array, pero corresponde al número de fila en Sheets
+      }
+    }
+
+    if (rowsToDelete.length === 0) {
+      return false;
+    }
+
+    // Obtener el sheetId
+    const spreadsheetMetadata = await sheets.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_ID,
+    });
+    const sheet = spreadsheetMetadata.data.sheets.find(s => s.properties.title === sheetName);
+    if (!sheet) throw new Error(`Pestaña ${sheetName} no encontrada en Google Sheets.`);
+    const sheetId = sheet.properties.sheetId;
+
+    // Ordenar de forma descendente para eliminar sin alterar los índices de las filas anteriores
+    rowsToDelete.sort((a, b) => b - a);
+
+    const requests = rowsToDelete.map(rowIndex => ({
+      deleteDimension: {
+        range: {
+          sheetId: sheetId,
+          dimension: 'ROWS',
+          startIndex: rowIndex, // 0-based, inclusive
+          endIndex: rowIndex + 1 // 0-based, exclusive
+        }
+      }
+    }));
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      requestBody: { requests }
+    });
+
+    return true;
+  } catch (error) {
+    console.error(`Error al eliminar filas en ${sheetName}:`, error);
+    throw error;
+  }
+}
+
