@@ -41,10 +41,7 @@ function ProductBarcode({ value, name }) {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Imprimir Código - ${name || 'Producto'}</title>
-          <link rel="preconnect" href="https://fonts.googleapis.com">
-          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-          <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700&display=swap" rel="stylesheet">
+          <title>Imprimir Código - ${value}</title>
           <style>
             @page {
               size: 100mm 148mm portrait;
@@ -59,91 +56,35 @@ function ProductBarcode({ value, name }) {
               width: 100mm;
               height: 148mm;
               display: flex;
-              flex-direction: column;
               align-items: center;
-              justify-content: space-between;
-              padding: 15mm 10mm;
-              font-family: 'Outfit', sans-serif;
+              justify-content: center;
               background-color: #ffffff;
-              color: #0f172a;
-              text-align: center;
-            }
-            .header {
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              gap: 4px;
-              width: 100%;
-            }
-            .brand {
-              font-size: 12px;
-              font-weight: 700;
-              letter-spacing: 2px;
-              text-transform: uppercase;
-              color: #4f46e5;
-            }
-            .divider {
-              width: 50px;
-              height: 2px;
-              background: linear-gradient(90deg, #4f46e5, #10b981);
-              margin: 8px 0;
-              border-radius: 1px;
-            }
-            .product-name {
-              font-size: 16px;
-              font-weight: 600;
-              line-height: 1.4;
-              margin-top: 8px;
-              max-height: 48px;
               overflow: hidden;
-              display: -webkit-box;
-              -webkit-line-clamp: 2;
-              -webkit-box-orient: vertical;
-              color: #0f172a;
             }
             .barcode-container {
-              flex-grow: 1;
               display: flex;
-              flex-direction: column;
               align-items: center;
               justify-content: center;
               width: 100%;
+              height: 100%;
             }
             .barcode-container svg {
-              width: 80mm !important;
+              width: 85mm !important;
               height: auto !important;
-              max-height: 50mm;
-            }
-            .footer {
-              font-size: 10px;
-              color: #64748b;
-              width: 100%;
-              border-top: 1px solid #e2e8f0;
-              padding-top: 10px;
-              display: flex;
-              justify-content: space-between;
+              max-height: 130mm;
             }
           </style>
         </head>
         <body>
-          <div class="header">
-            <span class="brand">VOTO NACIONAL</span>
-            <div class="divider"></div>
-            <h2 class="product-name">${name || 'Producto sin nombre'}</h2>
-          </div>
           <div class="barcode-container">
             ${barcodeHtml}
-          </div>
-          <div class="footer">
-            <span>REF: ${value}</span>
-            <span>${new Date().toLocaleDateString('es-CO')}</span>
           </div>
           <script>
             window.addEventListener('load', () => {
               setTimeout(() => {
                 window.print();
                 window.close();
-              }, 400);
+              }, 300);
             });
           <\/script>
         </body>
