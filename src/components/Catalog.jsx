@@ -44,7 +44,7 @@ function ProductBarcode({ value, name }) {
           <title>Imprimir Código - ${value}</title>
           <style>
             @page {
-              size: 100mm 148mm portrait;
+              size: 50mm 30mm;
               margin: 0;
             }
             * {
@@ -53,23 +53,24 @@ function ProductBarcode({ value, name }) {
               padding: 0;
             }
             body {
-              width: 100mm;
-              height: 148mm;
+              width: 50mm;
+              height: 30mm;
               display: flex;
               flex-direction: column;
               align-items: center;
-              justify-content: flex-start;
-              padding-top: 15mm;
+              justify-content: center;
+              padding: 1mm;
               background-color: #ffffff;
               overflow: hidden;
             }
             .barcode-container {
               display: flex;
               justify-content: center;
+              align-items: center;
               width: 100%;
             }
             .barcode-container svg {
-              width: 85mm !important;
+              width: 42.5mm !important;
               height: auto !important;
             }
           </style>
