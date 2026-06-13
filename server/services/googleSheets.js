@@ -3,9 +3,20 @@ import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-const KEY = process.env.GOOGLE_PRIVATE_KEY ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : null;
-const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
+let EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+let KEY = process.env.GOOGLE_PRIVATE_KEY;
+let SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
+
+// Clean up wrapping quotes (common hosting env issue)
+if (EMAIL && EMAIL.startsWith('"') && EMAIL.endsWith('"')) EMAIL = EMAIL.slice(1, -1);
+if (SPREADSHEET_ID && SPREADSHEET_ID.startsWith('"') && SPREADSHEET_ID.endsWith('"')) SPREADSHEET_ID = SPREADSHEET_ID.slice(1, -1);
+if (KEY) {
+  if (KEY.startsWith('"') && KEY.endsWith('"')) {
+    KEY = KEY.slice(1, -1);
+  }
+  KEY = KEY.replace(/\\n/g, '\n');
+}
+
 
 let auth;
 let sheets;
