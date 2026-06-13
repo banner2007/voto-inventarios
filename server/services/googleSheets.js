@@ -7,15 +7,30 @@ let EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 let KEY = process.env.GOOGLE_PRIVATE_KEY;
 let SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
 
-// Clean up wrapping quotes (common hosting env issue)
-if (EMAIL && EMAIL.startsWith('"') && EMAIL.endsWith('"')) EMAIL = EMAIL.slice(1, -1);
-if (SPREADSHEET_ID && SPREADSHEET_ID.startsWith('"') && SPREADSHEET_ID.endsWith('"')) SPREADSHEET_ID = SPREADSHEET_ID.slice(1, -1);
+// Clean up wrapping quotes and backslashes (common hosting env copy-paste issues)
+if (EMAIL) {
+  EMAIL = EMAIL.trim();
+  if (EMAIL.startsWith('"') && EMAIL.endsWith('"')) EMAIL = EMAIL.slice(1, -1);
+  EMAIL = EMAIL.trim();
+}
+if (SPREADSHEET_ID) {
+  SPREADSHEET_ID = SPREADSHEET_ID.trim();
+  if (SPREADSHEET_ID.startsWith('"') && SPREADSHEET_ID.endsWith('"')) SPREADSHEET_ID = SPREADSHEET_ID.slice(1, -1);
+  SPREADSHEET_ID = SPREADSHEET_ID.trim();
+}
 if (KEY) {
+  KEY = KEY.trim();
   if (KEY.startsWith('"') && KEY.endsWith('"')) {
     KEY = KEY.slice(1, -1);
   }
+  KEY = KEY.trim();
+  if (KEY.endsWith('\\')) {
+    KEY = KEY.slice(0, -1);
+  }
+  KEY = KEY.trim();
   KEY = KEY.replace(/\\n/g, '\n');
 }
+
 
 
 let auth;
