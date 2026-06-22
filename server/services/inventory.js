@@ -143,6 +143,7 @@ export async function registerPurchase(header, items, username) {
     const detailsToAppend = [];
     const movementsToAppend = [];
     const productsToUpdate = [];
+    const priceHistoriesToAppend = [];
 
     let calculatedTotalIva = 0;
     let calculatedTotalCompra = 0;
@@ -188,12 +189,26 @@ export async function registerPurchase(header, items, username) {
       // Actualizar información del producto
       const nuevoStock = prod.StockActual + cantidad;
       
-      // Si el precio de compra cambia, se actualiza el PrecioCompra. 
-      // Si el precio de venta nunca fue configurado manualmente (o si queremos refrescar el default),
-      // actualizamos el precio de venta sugerido (PrecioCompra * 1.40)
-      const nuevoPrecioVenta = prod.PrecioCompra === 0 || prod.PrecioVenta === prod.PrecioCompra * 1.40 
-        ? precioCosto * 1.40 
-        : prod.PrecioVenta;
+      // Si se proporciona un precio de venta personalizado, lo usamos.
+      // De lo contrario, usamos el sugerido (costo * 1.4) o el precio actual.
+      const nuevoPrecioVenta = item.precioVenta !== undefined && item.precioVenta !== null
+        ? parseFloat(item.precioVenta)
+        : (prod.PrecioCompra === 0 || prod.PrecioVenta === prod.PrecioCompra * 1.40 
+          ? precioCosto * 1.40 
+          : prod.PrecioVenta);
+
+      const precioVentaAnterior = parseFloat(prod.PrecioVenta) || 0;
+      if (nuevoPrecioVenta !== precioVentaAnterior) {
+        priceHistoriesToAppend.push({
+          IdHistorial: crypto.randomUUID(),
+          ReferenciaProducto: prod.Referencia,
+          PrecioCompra: precioCosto,
+          PrecioVentaAnterior: precioVentaAnterior,
+          PrecioVentaNuevo: nuevoPrecioVenta,
+          Usuario: username,
+          Fecha: new Date().toISOString()
+        });
+      }
 
       productsToUpdate.push({
         id: prod.IdProducto,
@@ -221,6 +236,9 @@ export async function registerPurchase(header, items, username) {
     await appendRows('Compras', [newPurchase]);
     await appendRows('CompraDetalles', detailsToAppend);
     await appendRows('Movimientos', movementsToAppend);
+    if (priceHistoriesToAppend.length > 0) {
+      await appendRows('PreciosHistorial', priceHistoriesToAppend);
+    }
 
     // Actualizar los productos en Google Sheets secuencialmente
     for (const itemToUpdate of productsToUpdate) {
@@ -501,6 +519,7 @@ export async function updatePurchase(idCompra, header, items, username) {
     const finalProductsToUpdate = [];
     const detailsToAppend = [];
     const movementsToAppend = [];
+    const priceHistoriesToAppend = [];
 
     let calculatedTotalIva = 0;
     let calculatedTotalCompra = 0;
@@ -529,10 +548,28 @@ export async function updatePurchase(idCompra, header, items, username) {
       }
       tempStocks[prod.Referencia] = nuevoStock;
 
+      const nuevoPrecioVenta = item.precioVenta !== undefined && item.precioVenta !== null
+        ? parseFloat(item.precioVenta)
+        : prod.PrecioVenta;
+
+      const precioVentaAnterior = parseFloat(prod.PrecioVenta) || 0;
+      if (nuevoPrecioVenta !== precioVentaAnterior) {
+        priceHistoriesToAppend.push({
+          IdHistorial: crypto.randomUUID(),
+          ReferenciaProducto: prod.Referencia,
+          PrecioCompra: precioCosto,
+          PrecioVentaAnterior: precioVentaAnterior,
+          PrecioVentaNuevo: nuevoPrecioVenta,
+          Usuario: username,
+          Fecha: new Date().toISOString()
+        });
+      }
+
       finalProductsToUpdate.push({
         id: prod.IdProducto,
         data: {
           PrecioCompra: precioCosto, // Actualiza con el último costo
+          PrecioVenta: nuevoPrecioVenta,
           StockActual: nuevoStock
         }
       });
@@ -565,6 +602,10 @@ export async function updatePurchase(idCompra, header, items, username) {
     // 4. Guardar los cambios de stock en Productos
     for (const itemToUpdate of finalProductsToUpdate) {
       await updateRow('Productos', 'IdProducto', itemToUpdate.id, itemToUpdate.data);
+    }
+
+    if (priceHistoriesToAppend.length > 0) {
+      await appendRows('PreciosHistorial', priceHistoriesToAppend);
     }
 
     // 5. Actualizar el encabezado en Compras

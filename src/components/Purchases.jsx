@@ -17,7 +17,7 @@ export default function Purchases({ token, showToast }) {
 
   // Items State (Dynamic Table)
   const [items, setItems] = useState([
-    { referencia: '', cantidad: 1, precioCosto: 0, ivaPagado: 0 }
+    { referencia: '', cantidad: 1, precioCosto: 0, ivaPagado: 0, precioVenta: 0 }
   ]);
 
   // Historial y búsqueda
@@ -63,12 +63,16 @@ export default function Purchases({ token, showToast }) {
       setFacturaNum(data.header.FacturaNum);
       setFechaCompra(data.header.FechaCompra);
       
-      setItems(data.items.map(item => ({
-        referencia: item.ReferenciaProducto,
-        cantidad: item.Cantidad,
-        precioCosto: item.PrecioCosto,
-        ivaPagado: item.IvaPagado
-      })));
+      setItems(data.items.map(item => {
+        const prod = products.find(p => p.Referencia.toUpperCase() === item.ReferenciaProducto.toUpperCase());
+        return {
+          referencia: item.ReferenciaProducto,
+          cantidad: item.Cantidad,
+          precioCosto: item.PrecioCosto,
+          ivaPagado: item.IvaPagado,
+          precioVenta: prod ? prod.PrecioVenta : 0
+        };
+      }));
       
       setActiveTab('form');
       showToast('Datos de la factura cargados en el formulario.', 'info');
@@ -108,7 +112,16 @@ export default function Purchases({ token, showToast }) {
     } else {
       setIdProveedor('');
     }
-    setItems([{ referencia: products.length > 0 ? products[0].Referencia : '', cantidad: 1, precioCosto: 0, ivaPagado: 0 }]);
+    const defaultProduct = products.length > 0 ? products[0] : null;
+    const defaultCost = defaultProduct ? defaultProduct.PrecioCompra : 0;
+    const defaultSalePrice = defaultProduct ? defaultProduct.PrecioVenta : 0;
+    setItems([{
+      referencia: defaultProduct ? defaultProduct.Referencia : '',
+      cantidad: 1,
+      precioCosto: defaultCost,
+      ivaPagado: 0,
+      precioVenta: defaultSalePrice
+    }]);
   };
 
   const filteredPurchases = purchases.filter(p => 
@@ -148,9 +161,18 @@ export default function Purchases({ token, showToast }) {
   }, []);
 
   const handleAddItem = () => {
+    const defaultProduct = products.length > 0 ? products[0] : null;
+    const defaultCost = defaultProduct ? defaultProduct.PrecioCompra : 0;
+    const defaultSalePrice = defaultProduct ? defaultProduct.PrecioVenta : 0;
     setItems([
       ...items,
-      { referencia: products.length > 0 ? products[0].Referencia : '', cantidad: 1, precioCosto: 0, ivaPagado: 0 }
+      {
+        referencia: defaultProduct ? defaultProduct.Referencia : '',
+        cantidad: 1,
+        precioCosto: defaultCost,
+        ivaPagado: 0,
+        precioVenta: defaultSalePrice
+      }
     ]);
   };
 
@@ -172,8 +194,25 @@ export default function Purchases({ token, showToast }) {
       newItems[index].precioCosto = Math.max(0, parseFloat(value) || 0);
     } else if (field === 'ivaPagado') {
       newItems[index].ivaPagado = Math.max(0, parseFloat(value) || 0);
+    } else if (field === 'precioVenta') {
+      newItems[index].precioVenta = value;
+    } else if (field === 'referencia') {
+      newItems[index].referencia = value;
+      const prod = products.find(p => p.Referencia === value);
+      if (prod) {
+        newItems[index].precioCosto = prod.PrecioCompra || 0;
+      }
     } else {
       newItems[index][field] = value;
+    }
+
+    // Auto-calcular precio de venta si cambiamos cantidad, costo, iva o referencia
+    if (field === 'cantidad' || field === 'precioCosto' || field === 'ivaPagado' || field === 'referencia') {
+      const qty = newItems[index].cantidad || 1;
+      const cost = newItems[index].precioCosto || 0;
+      const iva = newItems[index].ivaPagado || 0;
+      const calculated = (cost + (iva / qty)) * 10.3;
+      newItems[index].precioVenta = Math.round(calculated * 100) / 100;
     }
     
     setItems(newItems);
@@ -206,6 +245,11 @@ export default function Purchases({ token, showToast }) {
       }
       if (item.cantidad <= 0 || item.precioCosto <= 0) {
         showToast('La cantidad y el precio de costo deben ser mayores a cero.', 'warning');
+        return;
+      }
+      const venta = parseFloat(item.precioVenta);
+      if (isNaN(venta) || venta <= 0) {
+        showToast('El precio de venta debe ser un número mayor a cero.', 'warning');
         return;
       }
     }
@@ -360,12 +404,13 @@ export default function Purchases({ token, showToast }) {
                   <table>
                     <thead>
                       <tr>
-                        <th style={{ width: '40%' }}>Producto (Referencia - Nombre)</th>
-                        <th style={{ width: '12%' }}>Cantidad</th>
-                        <th style={{ width: '16%' }}>Precio Costo</th>
-                        <th style={{ width: '16%' }}>IVA Pagado</th>
-                        <th style={{ width: '16%' }}>Total</th>
-                        <th style={{ width: '8%', textAlign: 'center' }}></th>
+                        <th style={{ whiteSpace: 'nowrap' }}>Producto (Referencia - Nombre)</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>Cantidad</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>Precio Costo</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>IVA Pagado</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>Precio Venta</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>Total</th>
+                        <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -376,6 +421,7 @@ export default function Purchases({ token, showToast }) {
                               value={item.referencia} 
                               onChange={(e) => handleItemChange(index, 'referencia', e.target.value)}
                               required
+                              style={{ width: '100%' }}
                             >
                               <option value="" disabled>Seleccione producto...</option>
                               {products.map(p => (
@@ -392,6 +438,7 @@ export default function Purchases({ token, showToast }) {
                               value={item.cantidad}
                               onChange={(e) => handleItemChange(index, 'cantidad', e.target.value)}
                               required
+                              style={{ width: '100%' }}
                             />
                           </td>
                           <td>
@@ -403,6 +450,7 @@ export default function Purchases({ token, showToast }) {
                               value={item.precioCosto || ''}
                               onChange={(e) => handleItemChange(index, 'precioCosto', e.target.value)}
                               required
+                              style={{ width: '100%' }}
                             />
                           </td>
                           <td>
@@ -413,9 +461,21 @@ export default function Purchases({ token, showToast }) {
                               placeholder="0"
                               value={item.ivaPagado || ''}
                               onChange={(e) => handleItemChange(index, 'ivaPagado', e.target.value)}
+                              style={{ width: '100%' }}
                             />
                           </td>
-                          <td style={{ fontWeight: 600 }}>
+                          <td>
+                            <input 
+                              type="number" 
+                              min="0"
+                              step="0.01"
+                              placeholder="0"
+                              value={item.precioVenta || ''}
+                              onChange={(e) => handleItemChange(index, 'precioVenta', e.target.value)}
+                              style={{ width: '100%' }}
+                            />
+                          </td>
+                          <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
                             {formatCurrency(calculateRowTotal(item))}
                           </td>
                           <td style={{ textAlign: 'center' }}>
@@ -516,13 +576,13 @@ export default function Purchases({ token, showToast }) {
               <table>
                 <thead>
                   <tr>
-                    <th>Fecha</th>
-                    <th>Nº Factura</th>
-                    <th>Proveedor</th>
-                    <th>Total IVA</th>
-                    <th>Total Factura</th>
-                    <th>Usuario</th>
-                    <th style={{ textAlign: 'center' }}>Acciones</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>Fecha</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>Nº Factura</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>Proveedor</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>Total IVA</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>Total Factura</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>Usuario</th>
+                    <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
