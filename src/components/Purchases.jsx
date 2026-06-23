@@ -1,5 +1,143 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, Calendar, ShoppingBag, Loader2, Search, Edit2 } from 'lucide-react';
+
+function ProductSelector({ value, onChange, products, selectedRefs }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedProduct = products.find(p => p.Referencia === value);
+
+  const availableProducts = products.filter(p => {
+    if (selectedRefs.includes(p.Referencia) && p.Referencia !== value) {
+      return false;
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      return p.Referencia.toLowerCase().includes(q) || p.Nombre.toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%', minWidth: '220px' }}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)} 
+        style={{ 
+          padding: '0.65rem 0.875rem', 
+          borderRadius: 'var(--radius-md)', 
+          border: '1px solid var(--border-color)', 
+          backgroundColor: 'var(--bg-surface)', 
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          minHeight: '41px'
+        }}
+      >
+        {selectedProduct ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {selectedProduct.FotoUrl ? (
+              <img 
+                src={selectedProduct.FotoUrl} 
+                alt={selectedProduct.Nombre} 
+                style={{ width: '24px', height: '24px', objectFit: 'cover', borderRadius: '4px' }} 
+              />
+            ) : (
+              <div style={{ width: '24px', height: '24px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px' }} />
+            )}
+            <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+              {selectedProduct.Referencia} - {selectedProduct.Nombre}
+            </span>
+          </div>
+        ) : (
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Seleccione producto...</span>
+        )}
+        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>▼</span>
+      </div>
+
+      {isOpen && (
+        <div 
+          style={{ 
+            position: 'absolute', 
+            top: '100%', 
+            left: 0, 
+            right: 0, 
+            zIndex: 999, 
+            marginTop: '4px', 
+            backgroundColor: 'var(--bg-surface)', 
+            border: '1px solid var(--border-color)', 
+            borderRadius: 'var(--radius-md)', 
+            boxShadow: 'var(--shadow-lg)', 
+            maxHeight: '250px', 
+            overflowY: 'auto' 
+          }}
+        >
+          <div style={{ padding: '6px', borderBottom: '1px solid var(--border-color)' }}>
+            <input 
+              type="text" 
+              placeholder="Buscar producto..." 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              style={{ width: '100%', padding: '4px 8px', fontSize: '0.85rem' }} 
+              onClick={(e) => e.stopPropagation()} 
+            />
+          </div>
+
+          {availableProducts.length === 0 ? (
+            <div style={{ padding: '10px', fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+              No hay productos disponibles
+            </div>
+          ) : (
+            availableProducts.map(p => (
+              <div 
+                key={p.IdProducto} 
+                onClick={() => {
+                  onChange(p.Referencia);
+                  setIsOpen(false);
+                  setSearch('');
+                }}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '10px', 
+                  padding: '8px 10px', 
+                  cursor: 'pointer',
+                  borderBottom: '1px solid var(--bg-secondary)'
+                }}
+                className="dropdown-item-hover"
+              >
+                {p.FotoUrl ? (
+                  <img 
+                    src={p.FotoUrl} 
+                    alt={p.Nombre} 
+                    style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px' }} 
+                  />
+                ) : (
+                  <div style={{ width: '32px', height: '32px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px' }} />
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{p.Referencia}</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{p.Nombre}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * Módulo 2: Registro de Compras / Entrada de Inventario
@@ -161,13 +299,20 @@ export default function Purchases({ token, showToast }) {
   }, []);
 
   const handleAddItem = () => {
-    const defaultProduct = products.length > 0 ? products[0] : null;
-    const defaultCost = defaultProduct ? defaultProduct.PrecioCompra : 0;
-    const defaultSalePrice = defaultProduct ? defaultProduct.PrecioVenta : 0;
+    const selectedRefs = items.map(it => it.referencia);
+    const available = products.find(p => !selectedRefs.includes(p.Referencia));
+    
+    if (!available) {
+      showToast('Todos los productos del catálogo ya han sido agregados.', 'warning');
+      return;
+    }
+
+    const defaultCost = available.PrecioCompra || 0;
+    const defaultSalePrice = available.PrecioVenta || 0;
     setItems([
       ...items,
       {
-        referencia: defaultProduct ? defaultProduct.Referencia : '',
+        referencia: available.Referencia,
         cantidad: 1,
         precioCosto: defaultCost,
         ivaPagado: 0,
@@ -404,6 +549,7 @@ export default function Purchases({ token, showToast }) {
                   <table>
                     <thead>
                       <tr>
+                        <th style={{ whiteSpace: 'nowrap' }}>Foto</th>
                         <th style={{ whiteSpace: 'nowrap' }}>Producto (Referencia - Nombre)</th>
                         <th style={{ whiteSpace: 'nowrap' }}>Cantidad</th>
                         <th style={{ whiteSpace: 'nowrap' }}>Precio Costo</th>
@@ -414,81 +560,92 @@ export default function Purchases({ token, showToast }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {items.map((item, index) => (
-                        <tr key={index}>
-                          <td>
-                            <select 
-                              value={item.referencia} 
-                              onChange={(e) => handleItemChange(index, 'referencia', e.target.value)}
-                              required
-                              style={{ width: '100%' }}
-                            >
-                              <option value="" disabled>Seleccione producto...</option>
-                              {products.map(p => (
-                                <option key={p.IdProducto} value={p.Referencia}>
-                                  {p.Referencia} - {p.Nombre}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td>
-                            <input 
-                              type="number" 
-                              min="1"
-                              value={item.cantidad}
-                              onChange={(e) => handleItemChange(index, 'cantidad', e.target.value)}
-                              required
-                              style={{ width: '100%' }}
-                            />
-                          </td>
-                          <td>
-                            <input 
-                              type="number" 
-                              min="0"
-                              step="0.01"
-                              placeholder="0"
-                              value={item.precioCosto || ''}
-                              onChange={(e) => handleItemChange(index, 'precioCosto', e.target.value)}
-                              required
-                              style={{ width: '100%' }}
-                            />
-                          </td>
-                          <td>
-                            <input 
-                              type="number" 
-                              min="0"
-                              step="0.01"
-                              placeholder="0"
-                              value={item.ivaPagado || ''}
-                              onChange={(e) => handleItemChange(index, 'ivaPagado', e.target.value)}
-                              style={{ width: '100%' }}
-                            />
-                          </td>
-                          <td>
-                            <input 
-                              type="number" 
-                              min="0"
-                              step="0.01"
-                              placeholder="0"
-                              value={item.precioVenta || ''}
-                              onChange={(e) => handleItemChange(index, 'precioVenta', e.target.value)}
-                              style={{ width: '100%' }}
-                            />
-                          </td>
-                          <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
-                            {formatCurrency(calculateRowTotal(item))}
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <button 
-                              type="button" 
-                              className="btn btn-danger btn-icon-only"
-                              onClick={() => handleRemoveItem(index)}
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {items.map((item, index) => {
+                        const prod = products.find(p => p.Referencia === item.referencia);
+                        const selectedRefs = items.map((it, idx) => idx !== index ? it.referencia : '').filter(Boolean);
+                        
+                        return (
+                          <tr key={index}>
+                            <td>
+                              {prod && prod.FotoUrl ? (
+                                <img 
+                                  src={prod.FotoUrl} 
+                                  alt={prod.Nombre} 
+                                  style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} 
+                                />
+                              ) : (
+                                <div style={{ width: '40px', height: '40px', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  -
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              <ProductSelector 
+                                value={item.referencia}
+                                onChange={(val) => handleItemChange(index, 'referencia', val)}
+                                products={products}
+                                selectedRefs={selectedRefs}
+                              />
+                            </td>
+                            <td>
+                              <input 
+                                type="number" 
+                                min="1"
+                                value={item.cantidad}
+                                onChange={(e) => handleItemChange(index, 'cantidad', e.target.value)}
+                                required
+                                style={{ width: '100%' }}
+                              />
+                            </td>
+                            <td>
+                              <input 
+                                type="number" 
+                                min="0"
+                                step="0.01"
+                                placeholder="0"
+                                value={item.precioCosto || ''}
+                                onChange={(e) => handleItemChange(index, 'precioCosto', e.target.value)}
+                                required
+                                style={{ width: '100%' }}
+                              />
+                            </td>
+                            <td>
+                              <input 
+                                type="number" 
+                                min="0"
+                                step="0.01"
+                                placeholder="0"
+                                value={item.ivaPagado || ''}
+                                onChange={(e) => handleItemChange(index, 'ivaPagado', e.target.value)}
+                                style={{ width: '100%' }}
+                              />
+                            </td>
+                            <td>
+                              <input 
+                                type="number" 
+                                min="0"
+                                step="0.01"
+                                placeholder="0"
+                                value={item.precioVenta || ''}
+                                onChange={(e) => handleItemChange(index, 'precioVenta', e.target.value)}
+                                style={{ width: '100%' }}
+                              />
+                            </td>
+                            <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                              {formatCurrency(calculateRowTotal(item))}
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <button 
+                                type="button" 
+                                className="btn btn-danger btn-icon-only"
+                                onClick={() => handleRemoveItem(index)}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -624,6 +781,9 @@ export default function Purchases({ token, showToast }) {
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+        .dropdown-item-hover:hover {
+          background-color: var(--bg-secondary) !important;
         }
       `}</style>
     </div>
