@@ -131,6 +131,12 @@ export default function Sales({ token, user, showToast }) {
     setCart(newCart);
   };
 
+  const handlePriceChange = (index, value) => {
+    const newCart = [...cart];
+    newCart[index].precioVenta = value;
+    setCart(newCart);
+  };
+
   const handleRemoveItem = (index) => {
     const newCart = cart.filter((_, i) => i !== index);
     setCart(newCart);
@@ -138,7 +144,7 @@ export default function Sales({ token, user, showToast }) {
 
   // Calcular totales
   const totalItems = cart.reduce((sum, item) => sum + item.cantidad, 0);
-  const totalEgresoValue = cart.reduce((sum, item) => sum + (item.cantidad * item.precioVenta), 0);
+  const totalEgresoValue = cart.reduce((sum, item) => sum + (item.cantidad * (parseFloat(item.precioVenta) || 0)), 0);
 
   const handleSaveExit = async () => {
     if (cart.length === 0) {
@@ -157,7 +163,8 @@ export default function Sales({ token, user, showToast }) {
         body: JSON.stringify({
           items: cart.map(item => ({
             referencia: item.referencia,
-            cantidad: item.cantidad
+            cantidad: item.cantidad,
+            precioVenta: parseFloat(item.precioVenta) || 0
           }))
         })
       });
@@ -289,7 +296,16 @@ export default function Sales({ token, user, showToast }) {
                             {item.stockDisponible} ud.
                           </span>
                         </td>
-                        <td>{formatCurrency(item.precioVenta)}</td>
+                         <td>
+                          <input 
+                            type="number" 
+                            min="0"
+                            step="0.01"
+                            value={item.precioVenta || ''}
+                            onChange={(e) => handlePriceChange(index, e.target.value)}
+                            style={{ width: '100px', padding: '0.25rem 0.5rem' }}
+                          />
+                        </td>
                         <td>
                           <input 
                             type="number" 
@@ -301,7 +317,7 @@ export default function Sales({ token, user, showToast }) {
                           />
                         </td>
                         <td style={{ fontWeight: 600 }}>
-                          {formatCurrency(item.cantidad * item.precioVenta)}
+                          {formatCurrency(item.cantidad * (parseFloat(item.precioVenta) || 0))}
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <button 

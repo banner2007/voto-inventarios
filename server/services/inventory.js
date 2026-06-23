@@ -276,13 +276,19 @@ export async function registerSale(saleItems, username) {
         throw new Error(`Stock insuficiente para ${prod.Nombre} (Ref: ${prod.Referencia}). Disponible: ${prod.StockActual}, Solicitado: ${cantidadSalida}`);
       }
 
+      // Si se proporciona un precio de venta personalizado, lo usamos.
+      // De lo contrario, usamos el PrecioVenta de la base de datos.
+      const precioUnitario = item.precioVenta !== undefined && item.precioVenta !== null
+        ? parseFloat(item.precioVenta)
+        : prod.PrecioVenta;
+
       // Preparar movimiento (SALIDA)
       movementsToAppend.push({
         IdMovimiento: crypto.randomUUID(),
         ReferenciaProducto: prod.Referencia,
         Tipo: 'SALIDA',
         Cantidad: cantidadSalida,
-        PrecioUnitario: prod.PrecioVenta,
+        PrecioUnitario: precioUnitario,
         ReferenciaDocumento: 'VENTA_EGRESO',
         Usuario: username,
         Fecha: new Date().toISOString()
