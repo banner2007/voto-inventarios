@@ -8,7 +8,8 @@ import {
   CircleDollarSign,
   LogOut,
   Sun,
-  Moon
+  Moon,
+  LineChart
 } from 'lucide-react';
 
 /**
@@ -32,6 +33,7 @@ export default function Sidebar({
     { id: 'purchases', label: 'Compras', icon: <ShoppingBag size={20} /> },
     { id: 'catalog', label: 'Catálogo', icon: <Package size={20} /> },
     { id: 'sales', label: 'Egresos / Salidas', icon: <TrendingDown size={20} /> },
+    { id: 'vendidos', label: 'Vendidos', icon: <LineChart size={20} /> },
     ...(isAdmin ? [{ id: 'prices', label: 'Config. Precios', icon: <CircleDollarSign size={20} /> }] : [])
   ];
 

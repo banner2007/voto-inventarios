@@ -11,6 +11,7 @@ import {
   updateProduct,
   registerPurchase,
   registerSale,
+  getSales,
   updateProductPrice,
   getDashboardStats,
   getPurchases,
@@ -206,6 +207,15 @@ router.post('/sales', authenticateToken, async (req, res) => {
     }
     const result = await registerSale(items, req.user.username);
     res.status(201).json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/sales', authenticateToken, async (req, res) => {
+  try {
+    const sales = await getSales();
+    res.json(sales);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

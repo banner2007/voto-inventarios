@@ -647,3 +647,27 @@ export async function updatePurchase(idCompra, header, items, username) {
     return { idCompra, totalCompra: calculatedTotalCompra };
   });
 }
+
+export async function getSales() {
+  const movements = await readTable('Movimientos');
+  const products = await getProducts();
+
+  const sales = movements
+    .filter(m => m.Tipo === 'SALIDA')
+    .map(m => {
+      const prod = products.find(p => p.Referencia.toUpperCase() === m.ReferenciaProducto.toUpperCase());
+      return {
+        IdMovimiento: m.IdMovimiento,
+        ReferenciaProducto: m.ReferenciaProducto,
+        NombreProducto: prod ? prod.Nombre : 'Producto no encontrado',
+        FotoUrl: prod ? prod.FotoUrl : '',
+        Cantidad: parseInt(m.Cantidad, 10) || 0,
+        PrecioUnitario: parseFloat(m.PrecioUnitario) || 0,
+        Total: (parseInt(m.Cantidad, 10) || 0) * (parseFloat(m.PrecioUnitario) || 0),
+        Usuario: m.Usuario,
+        Fecha: m.Fecha
+      };
+    });
+
+  return sales.sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+}

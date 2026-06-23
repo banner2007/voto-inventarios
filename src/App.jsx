@@ -9,6 +9,7 @@ import Sales from './components/Sales';
 import Prices from './components/Prices';
 import Login from './components/Login';
 import Toast from './components/Toast';
+import Vendidos from './components/Vendidos';
 
 /**
  * Componente principal de la Aplicación
@@ -68,6 +69,8 @@ export default function App() {
         return <Sales token={token} user={user} showToast={showToast} />;
       case 'prices':
         return <Prices token={token} showToast={showToast} />;
+      case 'vendidos':
+        return <Vendidos token={token} showToast={showToast} />;
       default:
         return <Dashboard token={token} showToast={showToast} />;
     }
